@@ -55,7 +55,7 @@ body {
 .app-header {
   position: relative;
   z-index: 10;
-  padding: calc(var(--safe-top) + 1.25rem) 1.25rem 0.5rem;
+  padding: calc(var(--safe-top) + 0.65rem) 1rem 0.25rem;
   text-align: center;
   pointer-events: none;
 }
@@ -99,20 +99,46 @@ body {
 
 .music-player-host {
   position: fixed;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
+  left: -240px;
+  top: 0;
+  width: 200px;
+  height: 200px;
+  opacity: 0.01;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.music-unlock-btn {
+  position: fixed;
+  top: calc(var(--safe-top) + 0.55rem);
+  right: 0.75rem;
+  z-index: 30;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid rgba(255, 180, 210, 0.45);
+  border-radius: 999px;
+  background: rgba(20, 5, 18, 0.72);
+  color: rgba(255, 220, 235, 0.95);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.25);
+}
+
+.music-unlock-btn:active {
+  transform: scale(0.97);
 }
 
 .gallery {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--safe-bottom) + 4.5rem);
+  bottom: calc(var(--safe-bottom) + 2.35rem);
   z-index: 3;
-  padding: 0 1rem;
+  padding: 0 1.1rem;
 }
 
 .gallery-track {
@@ -130,9 +156,9 @@ body {
 
 .golden-frame {
   position: relative;
-  width: min(78vw, 300px);
+  width: min(56vw, 200px);
   aspect-ratio: 3 / 4;
-  padding: 10px;
+  padding: 7px;
   border-radius: 4px;
   background: linear-gradient(
     145deg,
@@ -200,8 +226,8 @@ body {
 .gallery-dots {
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
 }
 
 .dot {
@@ -225,7 +251,7 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--safe-bottom) + 1rem);
+  bottom: calc(var(--safe-bottom) + 0.45rem);
   z-index: 10;
   text-align: center;
   pointer-events: none;
@@ -283,6 +309,21 @@ body {
   .golden-frame {
     animation: none;
     transition: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .golden-frame {
+    width: min(50vw, 178px);
+    padding: 6px;
+  }
+
+  .gallery {
+    bottom: calc(var(--safe-bottom) + 2.1rem);
+  }
+
+  .app-hint {
+    font-size: 0.68rem;
   }
 }
 

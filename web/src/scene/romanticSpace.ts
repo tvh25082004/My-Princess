@@ -5,9 +5,11 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { COLORS, SCENE } from "./constants";
 import { createShaderPoints, createSoftGlowTexture } from "./particleMaterial";
+import { applyColors } from "../utils/particleColors";
 import {
   assignPastelColors,
   buildTargetBuffer,
+  buildTextTargetBuffer,
   sampleHollowHeart,
   sampleScatter,
   sampleTextShape,
@@ -81,7 +83,7 @@ export type RomanticSpaceHandle = {
 };
 
 export async function initRomanticSpace(container: HTMLElement): Promise<RomanticSpaceHandle> {
-  await document.fonts.load('700 72px "Cormorant Garamond"').catch(() => undefined);
+  await document.fonts.load('700 140px "Cormorant Garamond"').catch(() => undefined);
   await document.fonts.ready.catch(() => undefined);
 
   const mobile = isMobile();
@@ -110,7 +112,7 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1.5 : 2));
   renderer.setClearColor(COLORS.bgHex, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;
+  renderer.toneMappingExposure = 1.05;
   container.appendChild(renderer.domElement);
 
   const composer = new EffectComposer(renderer);
@@ -129,7 +131,8 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   scene.add(starNear.mesh);
 
   const content = new THREE.Group();
-  content.scale.setScalar(mobile ? 3.2 : 4.2);
+  content.position.y = mobile ? 24 : 14;
+  content.scale.setScalar(mobile ? 2.55 : 3.1);
   scene.add(content);
 
   const particles = createShaderPoints(count, glowMap, mobile);
@@ -137,16 +140,22 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   particles.mesh.geometry.attributes.color.needsUpdate = true;
   content.add(particles.mesh);
 
-  const fontSize = mobile ? 58 : 72;
-  const textOpts = { fontSize, density: 1.15, scale: mobile ? 0.13 : 0.15, zSpread: 10 };
+  const fontSize = mobile ? 128 : 140;
+  const textOpts = {
+    fontSize,
+    density: 4.2,
+    scale: mobile ? 0.34 : 0.36,
+    zSpread: 1.1,
+    offsetY: mobile ? 12 : 8,
+  };
 
-  const scatterTarget = buildTargetBuffer(sampleScatter(count, 120), count);
+  const scatterTarget = buildTargetBuffer(sampleScatter(count, mobile ? 38 : 48), count);
   const heartTarget = buildTargetBuffer(
     sampleHollowHeart(mobile ? 5500 : 8000),
     count
   );
   const textTargets = TEXT_SEQUENCE.map((label) =>
-    buildTargetBuffer(sampleTextShape(label, textOpts), count)
+    buildTextTargetBuffer(sampleTextShape(label, textOpts), count)
   );
 
   const fromBuf = new Float32Array(count * 3);
@@ -157,6 +166,7 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
 
   let morphT = 1;
   let phase: "intro" | "heart" = "intro";
+  let holdText = false;
   let clock = 0;
   let raf = 0;
   let alive = true;
@@ -193,21 +203,34 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
       },
     });
 
-    timeline.to({}, { duration: 0.6 });
-    timeline.add(morphTo(textTargets[0], 1.6));
-    timeline.to({}, { duration: 1.8 });
-    timeline.add(morphTo(scatterTarget, 0.9, "power2.in"));
+    const showWord = (target: Float32Array, hold = 2.6) => {
+      timeline!.call(() => {
+        holdText = true;
+      });
+      timeline!.add(morphTo(target, 1.35, "power3.out"));
+      timeline!.to({}, { duration: hold });
+    };
+
+    const briefScatter = () => {
+      timeline!.call(() => {
+        holdText = false;
+      });
+      timeline!.add(morphTo(scatterTarget, 0.5, "power2.inOut"));
+      timeline!.to({}, { duration: 0.25 });
+    };
+
     timeline.to({}, { duration: 0.35 });
-    timeline.add(morphTo(textTargets[1], 1.6));
-    timeline.to({}, { duration: 1.8 });
-    timeline.add(morphTo(scatterTarget, 0.9, "power2.in"));
-    timeline.to({}, { duration: 0.35 });
-    timeline.add(morphTo(textTargets[2], 1.6));
-    timeline.to({}, { duration: 1.6 });
-    timeline.add(morphTo(scatterTarget, 0.7, "power2.in"));
-    timeline.to({}, { duration: 0.25 });
+    showWord(textTargets[0], 2.8);
+    briefScatter();
+    showWord(textTargets[1], 2.8);
+    briefScatter();
+    showWord(textTargets[2], 2.6);
+    briefScatter();
+    timeline.call(() => {
+      holdText = false;
+    });
     timeline.add(morphTo(heartTarget, 2.2, "power4.out"));
-    timeline.to({}, { duration: 0.5 });
+    timeline.to({}, { duration: 0.8 });
   };
 
   runIntro();
@@ -222,21 +245,26 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
 
     const pos = particles.positions;
     const n = count;
+    const wiggleY = holdText ? 0.003 : phase === "heart" ? 0.018 : 0.008;
+    const wiggleZ = holdText ? 0.002 : phase === "heart" ? 0.012 : 0.006;
     for (let i = 0; i < n; i++) {
       const i3 = i * 3;
       const x = pos[i3];
       const y = pos[i3 + 1];
       const z = pos[i3 + 2];
-      pos[i3 + 1] = y + Math.sin(clock * 1.2 + x * 0.08 + i * 0.02) * 0.018;
-      pos[i3 + 2] = z + Math.sin(clock * 0.9 + y * 0.06) * 0.012;
+      pos[i3 + 1] = y + Math.sin(clock * 1.2 + x * 0.08 + i * 0.02) * wiggleY;
+      pos[i3 + 2] = z + Math.sin(clock * 0.9 + y * 0.06) * wiggleZ;
     }
 
     if (phase === "heart") {
       content.rotation.y += SCENE.rotationSpeed;
       content.rotation.x = Math.sin(clock * 0.35) * 0.14;
+    } else if (holdText) {
+      content.rotation.y *= 0.92;
+      content.rotation.x *= 0.92;
     } else {
-      content.rotation.y = Math.sin(clock * 0.2) * 0.06;
-      content.rotation.x = Math.sin(clock * 0.15) * 0.04;
+      content.rotation.y = Math.sin(clock * 0.2) * 0.04;
+      content.rotation.x = Math.sin(clock * 0.15) * 0.03;
     }
 
     const sway = clock * 1000;
@@ -260,6 +288,10 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
     parallax(starFar, reduced ? 4 : 9);
     starNear.mesh.rotation.y += 0.00008;
     starFar.mesh.rotation.y -= 0.00004;
+
+    const shimmer = holdText ? 0.18 : phase === "heart" ? 0.15 : 0.1;
+    applyColors(particles.colors, count, clock, shimmer);
+    particles.mesh.geometry.attributes.color.needsUpdate = true;
 
     particles.mesh.geometry.attributes.position.needsUpdate = true;
     composer.render();

@@ -3,15 +3,20 @@ import * as THREE from "three";
 export const COLORS = {
   bg: "#05010d",
   bgHex: 0x05010d,
-  pink: "#ff8fcf",
-  softPink: "#ffd1e8",
-  white: "#fff5fa",
+  pink: "#ff6b9d",
+  rose: "#ff1493",
+  softPink: "#ff8fcf",
+  gold: "#e8c872",
+  violet: "#c77dff",
 } as const;
 
+/** Không dùng trắng — tránh additive bloom thành cụm trắng loè */
 export const PALETTE: THREE.Color[] = [
+  new THREE.Color(COLORS.rose),
   new THREE.Color(COLORS.pink),
   new THREE.Color(COLORS.softPink),
-  new THREE.Color(COLORS.white),
+  new THREE.Color(COLORS.gold),
+  new THREE.Color(COLORS.violet),
 ];
 
 export const SCENE = {
@@ -19,11 +24,11 @@ export const SCENE = {
   particleCountMobile: 9000,
   cameraZ: 120,
   cameraZMobile: 88,
-  cameraY: 10,
+  cameraY: 14,
   heartScale: 1,
   rotationSpeed: 0.0025,
-  bloomStrength: 1.2,
-  bloomRadius: 0.4,
-  bloomThreshold: 0.42,
+  bloomStrength: 0.88,
+  bloomRadius: 0.38,
+  bloomThreshold: 0.58,
   fogDensity: 0.00085,
 } as const;
