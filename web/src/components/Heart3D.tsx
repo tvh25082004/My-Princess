@@ -9,12 +9,22 @@ export function Heart3D() {
     if (!container) return;
 
     let handle: RomanticSpaceHandle | undefined;
+    let cancelled = false;
 
-    initRomanticSpace(container).then((h) => {
-      handle = h;
-    });
+    initRomanticSpace(container)
+      .then((h) => {
+        if (cancelled) {
+          h.dispose();
+          return;
+        }
+        handle = h;
+      })
+      .catch((err) => {
+        console.error("[Heart3D] initRomanticSpace failed:", err);
+      });
 
     return () => {
+      cancelled = true;
       handle?.dispose();
     };
   }, []);

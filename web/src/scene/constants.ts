@@ -24,6 +24,6 @@ export const SCENE = {
   rotationSpeed: 0.0025,
   bloomStrength: 1.2,
   bloomRadius: 0.4,
-  bloomThreshold: 0.85,
+  bloomThreshold: 0.42,
   fogDensity: 0.00085,
 } as const;

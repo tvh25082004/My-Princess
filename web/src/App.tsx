@@ -1,5 +1,6 @@
 import { Heart3D } from "./components/Heart3D";
 import { MusicPlayer } from "./components/MusicPlayer";
+import { PhotoGallery } from "./components/PhotoGallery";
 
 export default function App() {
   return (
@@ -10,6 +11,8 @@ export default function App() {
         <p className="app-eyebrow">✨ Forever Yours ✨</p>
         <p className="app-hint">My Princess</p>
       </header>
+
+      <PhotoGallery />
 
       <MusicPlayer />
 

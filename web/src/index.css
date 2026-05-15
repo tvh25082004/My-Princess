@@ -54,7 +54,7 @@ body {
 
 .app-header {
   position: relative;
-  z-index: 2;
+  z-index: 10;
   padding: calc(var(--safe-top) + 1.25rem) 1.25rem 0.5rem;
   text-align: center;
   pointer-events: none;
@@ -226,7 +226,7 @@ body {
   left: 0;
   right: 0;
   bottom: calc(var(--safe-bottom) + 1rem);
-  z-index: 2;
+  z-index: 10;
   text-align: center;
   pointer-events: none;
 }

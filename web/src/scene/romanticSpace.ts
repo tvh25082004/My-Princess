@@ -134,6 +134,7 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
 
   const particles = createShaderPoints(count, glowMap, mobile);
   particles.colors.set(assignPastelColors(count));
+  particles.mesh.geometry.attributes.color.needsUpdate = true;
   content.add(particles.mesh);
 
   const fontSize = mobile ? 58 : 72;
@@ -244,15 +245,19 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
     camera.position.z = camZ + Math.sin(sway * 0.0001) * 6;
     camera.lookAt(0, 0, 0);
 
-    const parallax = (t: number, speed: number, arr: Float32Array, base: Float32Array) => {
-      for (let i = 0; i < base.length; i++) {
-        arr[i * 3 + 2] = base[i] + ((clock * speed + i * 0.3) % 400) - 200;
+    const parallax = (
+      star: { mesh: THREE.Points; positions: Float32Array; baseZ: Float32Array },
+      speed: number
+    ) => {
+      const { positions, baseZ } = star;
+      for (let i = 0; i < baseZ.length; i++) {
+        positions[i * 3 + 2] = baseZ[i] + ((clock * speed + i * 0.3) % 400) - 200;
       }
-      t.geometry.attributes.position.needsUpdate = true;
+      star.mesh.geometry.attributes.position.needsUpdate = true;
     };
 
-    parallax(starNear, reduced ? 8 : 18, starNear.positions, starNear.baseZ);
-    parallax(starFar, reduced ? 4 : 9, starFar.positions, starFar.baseZ);
+    parallax(starNear, reduced ? 8 : 18);
+    parallax(starFar, reduced ? 4 : 9);
     starNear.mesh.rotation.y += 0.00008;
     starFar.mesh.rotation.y -= 0.00004;
 
