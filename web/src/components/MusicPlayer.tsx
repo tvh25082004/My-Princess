@@ -40,7 +40,7 @@ export function MusicPlayer() {
   const hostRef = useRef<HTMLDivElement>(null);
   const unmutedRef = useRef(false);
   const touchModeRef = useRef(false);
-  const [showUnlock, setShowUnlock] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(true);
 
   const markPlaying = useCallback(() => {
     unmutedRef.current = true;
@@ -119,9 +119,13 @@ export function MusicPlayer() {
 
   useEffect(() => {
     touchModeRef.current = prefersTouchPlayback();
-    setShowUnlock(touchModeRef.current);
+    setShowUnlock(true);
 
     const boot = () => initPlayer();
+
+    const showIfSilent = window.setTimeout(() => {
+      if (!unmutedRef.current) setShowUnlock(true);
+    }, 2500);
 
     if (window.YT?.Player) {
       boot();
@@ -147,6 +151,7 @@ export function MusicPlayer() {
     document.addEventListener("click", onInteract);
 
     return () => {
+      window.clearTimeout(showIfSilent);
       document.removeEventListener("touchstart", onInteract);
       document.removeEventListener("click", onInteract);
     };

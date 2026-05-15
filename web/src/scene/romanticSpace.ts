@@ -1,11 +1,8 @@
 import gsap from "gsap";
 import * as THREE from "three";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { COLORS, SCENE } from "./constants";
-import { createShaderPoints, createSoftGlowTexture } from "./particleMaterial";
-import { applyColors } from "../utils/particleColors";
+import { createShaderPoints } from "./particleMaterial";
+import { applyColors, applyWordColors } from "../utils/particleColors";
 import {
   assignPastelColors,
   buildTargetBuffer,
@@ -18,7 +15,12 @@ import {
 const TEXT_SEQUENCE = ["Hà", "Hiền", "My"] as const;
 
 function isMobile() {
-  return window.matchMedia("(max-width: 768px)").matches || "ontouchstart" in window;
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
+/** Giữa khung trống — trên gallery, không chèn vào ảnh */
+function contentAnchorY(mobile: boolean): number {
+  return mobile ? 12 : 9;
 }
 
 function lerpBuf(
@@ -33,57 +35,24 @@ function lerpBuf(
   }
 }
 
-function buildStarfield(count: number, spread: number, parallax: number) {
-  const pos = new Float32Array(count * 3);
-  const col = new Float32Array(count * 3);
-  const baseZ = new Float32Array(count);
-
-  const tints = [
-    [1, 0.56, 0.81],
-    [1, 0.82, 0.91],
-    [0.92, 0.78, 1],
-    [1, 0.96, 0.98],
-  ];
-
-  for (let i = 0; i < count; i++) {
-    const i3 = i * 3;
-    pos[i3] = (Math.random() - 0.5) * spread;
-    pos[i3 + 1] = (Math.random() - 0.5) * spread;
-    pos[i3 + 2] = (Math.random() - 0.5) * spread * parallax;
-    baseZ[i] = pos[i3 + 2];
-    const tint = tints[Math.floor(Math.random() * tints.length)];
-    const dim = 0.35 + Math.random() * 0.45;
-    col[i3] = tint[0] * dim;
-    col[i3 + 1] = tint[1] * dim;
-    col[i3 + 2] = tint[2] * dim;
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-
-  const mesh = new THREE.Points(
-    geo,
-    new THREE.PointsMaterial({
-      size: 0.55,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.65,
-      sizeAttenuation: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  );
-
-  return { mesh, baseZ, positions: pos };
-}
-
 export type RomanticSpaceHandle = {
   dispose: () => void;
 };
 
 export async function initRomanticSpace(container: HTMLElement): Promise<RomanticSpaceHandle> {
-  await document.fonts.load('700 140px "Cormorant Garamond"').catch(() => undefined);
+  const probe = document.createElement("canvas");
+  const gl =
+    probe.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ??
+    probe.getContext("webgl", { failIfMajorPerformanceCaveat: false });
+  if (!gl) {
+    throw new Error("WebGL không khả dụng trên thiết bị này");
+  }
+
+  await Promise.all([
+    document.fonts.load('700 160px "Cormorant Garamond"'),
+    document.fonts.load('800 160px "Cormorant Garamond"'),
+    document.fonts.load('800 160px Outfit'),
+  ]).catch(() => undefined);
   await document.fonts.ready.catch(() => undefined);
 
   const mobile = isMobile();
@@ -91,9 +60,8 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   const count = mobile ? SCENE.particleCountMobile : SCENE.particleCount;
   const camZ = mobile ? SCENE.cameraZMobile : SCENE.cameraZ;
 
-  const glowMap = createSoftGlowTexture();
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(COLORS.bgHex, SCENE.fogDensity);
+  scene.fog = new THREE.FogExp2(COLORS.bgHex, SCENE.fogDensity * 1.15);
 
   const camera = new THREE.PerspectiveCamera(
     52,
@@ -101,7 +69,9 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
     0.1,
     3000
   );
-  camera.position.set(0, SCENE.cameraY, camZ);
+  const camY = mobile ? SCENE.cameraYMobile : SCENE.cameraY;
+  const lookY = mobile ? SCENE.lookAtYMobile : SCENE.lookAtY;
+  camera.position.set(0, camY, camZ);
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -111,47 +81,40 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1.5 : 2));
   renderer.setClearColor(COLORS.bgHex, 1);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-  container.appendChild(renderer.domElement);
+  renderer.toneMapping = THREE.NoToneMapping;
 
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
-    mobile ? SCENE.bloomStrength * 0.85 : SCENE.bloomStrength,
-    SCENE.bloomRadius,
-    SCENE.bloomThreshold
-  );
-  composer.addPass(bloom);
+  const canvas = renderer.domElement;
+  canvas.style.display = "block";
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  container.appendChild(canvas);
 
-  const starNear = buildStarfield(mobile ? 2200 : 4500, 2000, 1);
-  const starFar = buildStarfield(mobile ? 1500 : 3200, 2800, 0.55);
-  scene.add(starFar.mesh);
-  scene.add(starNear.mesh);
+  const contentScaleHeart = mobile ? 1.75 : 2;
 
   const content = new THREE.Group();
-  content.position.y = mobile ? 24 : 14;
-  content.scale.setScalar(mobile ? 2.55 : 3.1);
+  content.position.y = contentAnchorY(mobile);
+  content.scale.setScalar(contentScaleHeart);
   scene.add(content);
 
-  const particles = createShaderPoints(count, glowMap, mobile);
+  const particles = createShaderPoints(count, mobile);
   particles.colors.set(assignPastelColors(count));
   particles.mesh.geometry.attributes.color.needsUpdate = true;
   content.add(particles.mesh);
 
-  const fontSize = mobile ? 128 : 140;
+  const fontSize = mobile ? 140 : 156;
   const textOpts = {
     fontSize,
-    density: 4.2,
-    scale: mobile ? 0.34 : 0.36,
-    zSpread: 1.1,
-    offsetY: mobile ? 12 : 8,
+    density: 5,
+    targetSize: mobile ? 13.5 : 15,
+    zDepth: 20,
+    offsetY: 0,
   };
 
-  const scatterTarget = buildTargetBuffer(sampleScatter(count, mobile ? 38 : 48), count);
+  await document.fonts.load(`700 ${fontSize}px "Cormorant Garamond"`).catch(() => undefined);
+
+  const scatterTarget = buildTargetBuffer(sampleScatter(count, mobile ? 32 : 38), count);
   const heartTarget = buildTargetBuffer(
-    sampleHollowHeart(mobile ? 5500 : 8000),
+    sampleHollowHeart(mobile ? 5500 : 8000, 0.38, textOpts.offsetY),
     count
   );
   const textTargets = TEXT_SEQUENCE.map((label) =>
@@ -170,67 +133,71 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   let clock = 0;
   let raf = 0;
   let alive = true;
+  let textWordIndex = 0;
   let timeline: gsap.core.Timeline | null = null;
+  const particleMat = particles.mesh.material as THREE.ShaderMaterial;
+  const uMaxPoint = particleMat.uniforms.uMaxPoint as { value: number };
+  const uSizeMul = particleMat.uniforms.uSizeMul as { value: number };
 
-  const morphTo = (target: Float32Array, duration: number, ease = "power3.inOut") => {
-    fromBuf.set(particles.positions);
-    toBuf.set(target);
-    morphT = 0;
-    return gsap.to(
+  const morphTo = (target: Float32Array, duration: number, ease = "power3.inOut") =>
+    gsap.to(
       { t: 0 },
       {
         t: 1,
         duration,
         ease,
+        onStart() {
+          fromBuf.set(particles.positions);
+          toBuf.set(target);
+          morphT = 0;
+        },
         onUpdate() {
           morphT = (this.targets()[0] as { t: number }).t;
         },
       }
     );
-  };
 
   const runIntro = () => {
     if (reduced) {
-      morphTo(heartTarget, 2).then(() => {
-        phase = "heart";
+      timeline = gsap.timeline({ onComplete: () => { phase = "heart"; } });
+      for (let wi = 0; wi < TEXT_SEQUENCE.length; wi++) {
+        const idx = wi;
+        timeline.call(() => {
+          textWordIndex = idx;
+          holdText = true;
+        });
+        timeline.add(morphTo(textTargets[idx], 1.8, "power2.inOut"));
+        timeline.to({}, { duration: 2 });
+      }
+      timeline.call(() => {
+        holdText = false;
       });
+      timeline.add(morphTo(heartTarget, 2.4, "power2.inOut"));
       return;
     }
 
-    timeline = gsap.timeline({
-      onComplete: () => {
-        phase = "heart";
-      },
-    });
+    timeline = gsap.timeline({ onComplete: () => { phase = "heart"; } });
 
-    const showWord = (target: Float32Array, hold = 2.6) => {
+    const showWord = (wi: number, morphDur = 2.6, hold = 3.2) => {
       timeline!.call(() => {
+        textWordIndex = wi;
         holdText = true;
       });
-      timeline!.add(morphTo(target, 1.35, "power3.out"));
+      timeline!.add(morphTo(textTargets[wi], morphDur, "power2.inOut"));
       timeline!.to({}, { duration: hold });
     };
 
-    const briefScatter = () => {
-      timeline!.call(() => {
-        holdText = false;
-      });
-      timeline!.add(morphTo(scatterTarget, 0.5, "power2.inOut"));
-      timeline!.to({}, { duration: 0.25 });
-    };
-
-    timeline.to({}, { duration: 0.35 });
-    showWord(textTargets[0], 2.8);
-    briefScatter();
-    showWord(textTargets[1], 2.8);
-    briefScatter();
-    showWord(textTargets[2], 2.6);
-    briefScatter();
+    timeline.to({}, { duration: 0.4 });
+    timeline.add(morphTo(scatterTarget, 1.2, "power2.out"));
+    timeline.to({}, { duration: 0.25 });
+    showWord(0, 2.8, 3.4);
+    showWord(1, 2.8, 3.4);
+    showWord(2, 2.8, 3.2);
     timeline.call(() => {
       holdText = false;
     });
-    timeline.add(morphTo(heartTarget, 2.2, "power4.out"));
-    timeline.to({}, { duration: 0.8 });
+    timeline.add(morphTo(heartTarget, 3, "power2.inOut"));
+    timeline.to({}, { duration: 0.6 });
   };
 
   runIntro();
@@ -245,56 +212,50 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
 
     const pos = particles.positions;
     const n = count;
-    const wiggleY = holdText ? 0.003 : phase === "heart" ? 0.018 : 0.008;
-    const wiggleZ = holdText ? 0.002 : phase === "heart" ? 0.012 : 0.006;
-    for (let i = 0; i < n; i++) {
-      const i3 = i * 3;
-      const x = pos[i3];
-      const y = pos[i3 + 1];
-      const z = pos[i3 + 2];
-      pos[i3 + 1] = y + Math.sin(clock * 1.2 + x * 0.08 + i * 0.02) * wiggleY;
-      pos[i3 + 2] = z + Math.sin(clock * 0.9 + y * 0.06) * wiggleZ;
+    const wiggleY = holdText ? 0.002 : phase === "heart" ? 0.006 : 0.004;
+    const wiggleZ = holdText ? 0.001 : phase === "heart" ? 0.004 : 0.003;
+    if (wiggleY > 0 || wiggleZ > 0) {
+      for (let i = 0; i < n; i++) {
+        const i3 = i * 3;
+        const x = pos[i3];
+        const y = pos[i3 + 1];
+        const z = pos[i3 + 2];
+        pos[i3 + 1] = y + Math.sin(clock * 1.2 + x * 0.08 + i * 0.02) * wiggleY;
+        pos[i3 + 2] = z + Math.sin(clock * 0.9 + y * 0.06) * wiggleZ;
+      }
     }
 
     if (phase === "heart") {
       content.rotation.y += SCENE.rotationSpeed;
       content.rotation.x = Math.sin(clock * 0.35) * 0.14;
     } else if (holdText) {
-      content.rotation.y *= 0.92;
-      content.rotation.x *= 0.92;
+      content.rotation.y = Math.sin(clock * 0.16) * 0.055;
+      content.rotation.x = Math.sin(clock * 0.2) * 0.04;
     } else {
       content.rotation.y = Math.sin(clock * 0.2) * 0.04;
       content.rotation.x = Math.sin(clock * 0.15) * 0.03;
     }
 
     const sway = clock * 1000;
-    camera.position.x = Math.sin(sway * 0.0002) * (mobile ? 14 : 20);
-    camera.position.y = SCENE.cameraY + Math.sin(sway * 0.00015) * 3.5;
-    camera.position.z = camZ + Math.sin(sway * 0.0001) * 6;
-    camera.lookAt(0, 0, 0);
+    camera.position.x = Math.sin(sway * 0.0002) * (holdText ? 2 : mobile ? 8 : 12);
+    camera.position.y = camY + Math.sin(sway * 0.00015) * (holdText ? 0.6 : 2.5);
+    camera.position.z = camZ + Math.sin(sway * 0.0001) * (holdText ? 1.5 : 5);
+    camera.lookAt(0, lookY, 0);
 
-    const parallax = (
-      star: { mesh: THREE.Points; positions: Float32Array; baseZ: Float32Array },
-      speed: number
-    ) => {
-      const { positions, baseZ } = star;
-      for (let i = 0; i < baseZ.length; i++) {
-        positions[i * 3 + 2] = baseZ[i] + ((clock * speed + i * 0.3) % 400) - 200;
-      }
-      star.mesh.geometry.attributes.position.needsUpdate = true;
-    };
-
-    parallax(starNear, reduced ? 8 : 18);
-    parallax(starFar, reduced ? 4 : 9);
-    starNear.mesh.rotation.y += 0.00008;
-    starFar.mesh.rotation.y -= 0.00004;
-
-    const shimmer = holdText ? 0.18 : phase === "heart" ? 0.15 : 0.1;
-    applyColors(particles.colors, count, clock, shimmer);
+    if (holdText) {
+      applyWordColors(particles.colors, count, clock, textWordIndex, mobile ? 0.1 : 0.14, mobile);
+    } else {
+      const colorMode = phase === "heart" ? "heart" : "scatter";
+      const shimmer = phase === "heart" ? (mobile ? 0.1 : 0.15) : 0.1;
+      applyColors(particles.colors, count, clock, shimmer, colorMode, mobile);
+    }
     particles.mesh.geometry.attributes.color.needsUpdate = true;
 
+    uSizeMul.value = holdText || phase === "heart" ? 1 : 0.9;
+    uMaxPoint.value = holdText || phase === "heart" ? (mobile ? 11 : 13) : mobile ? 9 : 10;
+
     particles.mesh.geometry.attributes.position.needsUpdate = true;
-    composer.render();
+    renderer.render(scene, camera);
   };
 
   animate();
@@ -302,11 +263,12 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   const onResize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const m = window.matchMedia("(max-width: 768px)").matches;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    camera.position.y = m ? SCENE.cameraYMobile : SCENE.cameraY;
+    content.position.y = contentAnchorY(m);
     renderer.setSize(w, h);
-    composer.setSize(w, h);
-    bloom.resolution.set(w, h);
   };
   window.addEventListener("resize", onResize);
 
@@ -317,16 +279,12 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
       gsap.killTweensOf({ t: 0 });
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
-      glowMap.dispose();
-      composer.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
       particles.mesh.geometry.dispose();
       (particles.mesh.material as THREE.Material).dispose();
-      starNear.mesh.geometry.dispose();
-      starFar.mesh.geometry.dispose();
     },
   };
 }

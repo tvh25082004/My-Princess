@@ -20,18 +20,53 @@ export function pickParticleColor(seed: number, time = 0): [number, number, numb
   ];
 }
 
+/** Hồng magenta đậm giống mockup — từng chữ một */
+const WORD_MAGENTA: [number, number, number][] = [
+  [1, 0.06, 0.38],
+  [1, 0.1, 0.44],
+  [1, 0.08, 0.4],
+];
+
+export function applyWordColors(
+  colors: Float32Array,
+  count: number,
+  time: number,
+  wordIndex: number,
+  shimmer = 0.18,
+  mobile = false
+): void {
+  const base = WORD_MAGENTA[wordIndex % WORD_MAGENTA.length];
+  const maxR = mobile ? 0.88 : 0.92;
+  const maxG = mobile ? 0.42 : 0.5;
+  const maxB = mobile ? 0.58 : 0.65;
+
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    const pulse = 1 + shimmer * 0.5 * Math.sin(time * 2.2 + i * 0.08);
+    colors[i3] = Math.min(maxR, base[0] * pulse);
+    colors[i3 + 1] = Math.min(maxG, base[1] * pulse);
+    colors[i3 + 2] = Math.min(maxB, base[2] * pulse);
+  }
+}
+
 export function applyColors(
   colors: Float32Array,
   count: number,
   time: number,
-  shimmer = 0.12
+  shimmer = 0.12,
+  mode: "heart" | "text" | "scatter" = "heart",
+  mobile = false
 ): void {
+  const maxG = mobile ? 0.5 : mode === "text" ? 0.52 : 0.72;
+  const maxB = mobile ? 0.65 : mode === "text" ? 0.68 : 0.82;
+  const maxR = mobile ? 0.88 : mode === "text" ? 0.95 : 1;
+
   for (let i = 0; i < count; i++) {
     const i3 = i * 3;
     const base = pickParticleColor(i * 0.017, time);
     const pulse = 1 + shimmer * Math.sin(time * 2.8 + i * 0.09);
-    colors[i3] = Math.min(1, base[0] * pulse);
-    colors[i3 + 1] = Math.min(0.85, base[1] * pulse);
-    colors[i3 + 2] = Math.min(0.9, base[2] * pulse);
+    colors[i3] = Math.min(maxR, base[0] * pulse);
+    colors[i3 + 1] = Math.min(maxG, base[1] * pulse);
+    colors[i3 + 2] = Math.min(maxB, base[2] * pulse);
   }
 }

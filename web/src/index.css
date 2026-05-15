@@ -49,7 +49,53 @@ body {
   position: fixed;
   inset: 0;
   z-index: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+}
+
+.heart-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.love-text-sequence {
+  position: fixed;
+  left: 50%;
+  top: 31%;
+  z-index: 4;
+  width: min(100vw, 430px);
+  height: 7rem;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  perspective: 900px;
+}
+
+.love-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: clamp(4.2rem, 18vw, 6.4rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #ff5c9f;
+  opacity: 0;
+  transform: translate3d(0, 0, 34px) rotateX(14deg) rotateY(-10deg) scale(0.82);
+  text-shadow:
+    0 1px 0 #ffb4cf,
+    0 2px 0 #d9397c,
+    0 4px 0 #8c164c,
+    0 8px 18px rgba(255, 40, 135, 0.42);
+  animation: love-word-pop 4.2s ease-in-out both;
+}
+
+.love-text--heart {
+  color: #ff3f86;
+  font-size: clamp(4.6rem, 20vw, 7rem);
 }
 
 .app-header {
@@ -78,7 +124,6 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 24px rgba(255, 105, 180, 0.35));
 }
 
 .app-subtitle {
@@ -125,7 +170,7 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .music-unlock-btn:active {
@@ -173,9 +218,7 @@ body {
   box-shadow:
     0 0 0 1px rgba(255, 240, 200, 0.35),
     0 12px 40px rgba(0, 0, 0, 0.55),
-    0 0 60px rgba(255, 105, 180, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  animation: frame-glow 4s ease-in-out infinite;
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .golden-frame img {
@@ -244,7 +287,6 @@ body {
 .dot--active {
   background: linear-gradient(135deg, var(--rose), var(--gold));
   transform: scale(1.35);
-  box-shadow: 0 0 12px rgba(255, 105, 180, 0.6);
 }
 
 .app-footer {
@@ -274,21 +316,19 @@ body {
   }
 }
 
-@keyframes frame-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px rgba(255, 240, 200, 0.35),
-      0 12px 40px rgba(0, 0, 0, 0.55),
-      0 0 50px rgba(255, 105, 180, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+@keyframes love-word-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 34px) rotateX(18deg) rotateY(-13deg) scale(0.82);
   }
-  50% {
-    box-shadow:
-      0 0 0 1px rgba(255, 240, 200, 0.5),
-      0 14px 44px rgba(0, 0, 0, 0.5),
-      0 0 72px rgba(255, 105, 180, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  12%,
+  82% {
+    opacity: 1;
+    transform: translate3d(0, 0, 34px) rotateX(12deg) rotateY(-8deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -16px, 34px) rotateX(10deg) rotateY(8deg) scale(0.9);
   }
 }
 
@@ -306,13 +346,18 @@ body {
   .gallery-track,
   .app-eyebrow,
   .app-footer p,
-  .golden-frame {
-    animation: none;
+  .golden-frame,
+  .love-text {
     transition: none;
   }
 }
 
 @media (max-width: 768px) {
+  .love-text-sequence {
+    top: 30%;
+    height: 6rem;
+  }
+
   .golden-frame {
     width: min(50vw, 178px);
     padding: 6px;

@@ -11,3 +11,4 @@ web/.vite/
 
 # Cursor local (optional tooling)
 .cursor/
+.gstack/

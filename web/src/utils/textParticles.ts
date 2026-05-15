@@ -25,8 +25,7 @@ export function sampleText(
   canvas.width = textW;
   canvas.height = textH;
 
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, textW, textH);
+  ctx.clearRect(0, 0, textW, textH);
   ctx.fillStyle = "#fff";
   ctx.font = font;
   ctx.textAlign = "center";
@@ -40,7 +39,9 @@ export function sampleText(
   for (let py = 0; py < textH; py += step) {
     for (let px = 0; px < textW; px += step) {
       const idx = (py * textW + px) * 4;
-      if (imageData.data[idx + 3] > 80) {
+      const alpha = imageData.data[idx + 3];
+      const brightness = imageData.data[idx] + imageData.data[idx + 1] + imageData.data[idx + 2];
+      if (alpha > 80 && brightness > 140) {
         points.push({
           x: (px - textW / 2) * particleScale,
           y: -(py - textH / 2) * particleScale,

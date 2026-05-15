@@ -1,26 +1,10 @@
 import * as THREE from "three";
 
-export function createSoftGlowTexture(): THREE.CanvasTexture {
-  const size = 128;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  g.addColorStop(0, "rgba(255, 80, 150, 0.92)");
-  g.addColorStop(0.25, "rgba(255, 50, 130, 0.5)");
-  g.addColorStop(0.55, "rgba(220, 40, 120, 0.2)");
-  g.addColorStop(1, "rgba(0, 0, 0, 0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.needsUpdate = true;
-  return tex;
-}
-
 const vertexShader = /* glsl */ `
   attribute float aSize;
   attribute vec3 color;
+  uniform float uMaxPoint;
+  uniform float uSizeMul;
   varying vec3 vColor;
   varying float vDepth;
 
@@ -28,12 +12,13 @@ const vertexShader = /* glsl */ `
     vColor = color;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vDepth = -mvPosition.z;
-    float sizeScale = 280.0 / max(vDepth, 1.0);
-    gl_PointSize = clamp(aSize * sizeScale, 0.5, 14.0);
+    float sizeScale = 240.0 / max(vDepth, 1.0);
+    gl_PointSize = clamp(aSize * sizeScale * uSizeMul, 0.5, uMaxPoint);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
 
+/** Hạt tròn sắc — không halo, không vệt sáng */
 const fragmentShader = /* glsl */ `
   varying vec3 vColor;
   varying float vDepth;
@@ -43,20 +28,16 @@ const fragmentShader = /* glsl */ `
     float d = length(uv);
     if (d > 0.5) discard;
 
-    float core = smoothstep(0.5, 0.0, d);
-    float glow = smoothstep(0.5, 0.12, d);
-    float depthFade = clamp(1.0 - (vDepth - 40.0) / 220.0, 0.35, 1.0);
-    float alpha = glow * 0.78 * depthFade;
-    vec3 col = vColor * (0.7 + core * 0.3);
-    col = clamp(col, vec3(0.0), vec3(1.0, 0.62, 0.78));
+    float alpha = smoothstep(0.5, 0.38, d);
+    float depthFade = clamp(1.0 - (vDepth - 50.0) / 280.0, 0.55, 1.0);
+    vec3 col = clamp(vColor, vec3(0.0), vec3(0.78, 0.4, 0.58));
 
-    gl_FragColor = vec4(col, alpha);
+    gl_FragColor = vec4(col, alpha * depthFade * 0.58);
   }
 `;
 
 export function createShaderPoints(
   count: number,
-  glowMap: THREE.Texture,
   mobile: boolean
 ): {
   mesh: THREE.Points;
@@ -69,7 +50,7 @@ export function createShaderPoints(
   const colors = new Float32Array(count * 3);
 
   for (let i = 0; i < count; i++) {
-    sizes[i] = (mobile ? 2.4 : 2.2) * (0.65 + Math.random() * 0.5);
+    sizes[i] = (mobile ? 1.85 : 1.75) * (0.7 + Math.random() * 0.35);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -79,13 +60,14 @@ export function createShaderPoints(
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      uMap: { value: glowMap },
+      uMaxPoint: { value: mobile ? 10 : 12 },
+      uSizeMul: { value: 1 },
     },
     vertexShader,
     fragmentShader,
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
 
   const mesh = new THREE.Points(geo, mat);

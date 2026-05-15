@@ -3,64 +3,136 @@ import { PALETTE } from "./constants";
 
 export type Vec3 = { x: number; y: number; z: number };
 
+/** Chữ 3D dạng mesh hạt — cùng kiểu độ sâu Z như trái tim */
 export function sampleTextShape(
   text: string,
   opts?: {
     fontSize?: number;
     density?: number;
-    scale?: number;
-    zSpread?: number;
+    targetSize?: number;
+    zDepth?: number;
     offsetY?: number;
   }
 ): Vec3[] {
   const fontSize = opts?.fontSize ?? 96;
-  const density = opts?.density ?? 2.4;
-  const baseScale = opts?.scale ?? 0.2;
-  const zSpread = opts?.zSpread ?? 2.5;
+  const density = opts?.density ?? 4.5;
+  const targetSize = opts?.targetSize ?? 14;
+  const zDepth = opts?.zDepth ?? 20;
   const offsetY = opts?.offsetY ?? 0;
-  const scale = baseScale * (1 + Math.max(0, 4 - text.length) * 0.08);
 
+  const font = `800 ${fontSize}px "Cormorant Garamond", "Times New Roman", Times, "Arial Unicode MS", "Lucida Grande", Georgia, system-ui, serif`;
+
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = font;
+  const pad = fontSize * 0.4;
+  const metrics = measure.measureText(text);
+  const w = Math.ceil(Math.max(metrics.width + pad * 2, fontSize * 1.5));
+  const h = Math.ceil(fontSize * 1.35);
+
+  const dpr = 4;
   const canvas = document.createElement("canvas");
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
   const ctx = canvas.getContext("2d")!;
-  const font = `700 ${fontSize}px "Cormorant Garamond", Georgia, serif`;
-
-  const pad = fontSize * 0.55;
-  const metrics = ctx.measureText(text);
-  const w = Math.ceil(Math.max(metrics.width + pad * 2, fontSize * 1.8));
-  const h = Math.ceil(fontSize * 1.45);
-
-  canvas.width = w;
-  canvas.height = h;
+  ctx.scale(dpr, dpr);
   ctx.font = font;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, w / 2, h / 2);
+  const tx = w / 2;
+  const ty = h / 2;
+  ctx.lineWidth = Math.max(5, fontSize * 0.085);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "#fff";
+  ctx.strokeText(text, tx, ty);
+  ctx.fillText(text, tx, ty);
 
-  const data = ctx.getImageData(0, 0, w, h);
-  const pts: Vec3[] = [];
-  const step = Math.max(1, Math.round(1.6 / density));
+  const data = ctx.getImageData(0, 0, w * dpr, h * dpr);
+  const raw: Vec3[] = [];
+  const step = Math.max(1, Math.round((1.1 / density) * dpr));
 
-  for (let py = 0; py < h; py += step) {
-    for (let px = 0; px < w; px += step) {
-      const idx = (py * w + px) * 4;
-      if (data.data[idx + 3] > 72) {
-        pts.push({
-          x: (px - w / 2) * scale,
-          y: -(py - h / 2) * scale + offsetY,
-          z: (Math.random() - 0.5) * zSpread,
+  const cw = w * dpr;
+  for (let py = 0; py < h * dpr; py += step) {
+    for (let px = 0; px < w * dpr; px += step) {
+      const idx = (py * cw + px) * 4;
+      if (data.data[idx + 3] > 40) {
+        raw.push({
+          x: px / dpr - w / 2,
+          y: -(py / dpr - h / 2),
+          z: 0,
         });
       }
     }
+  }
+
+  if (raw.length < 48) {
+    const cols = 16 + text.length * 5;
+    const rows = 10;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        raw.push({
+          x: (c / cols - 0.5) * fontSize * 0.65,
+          y: (0.5 - r / rows) * fontSize * 0.45,
+          z: 0,
+        });
+      }
+    }
+  }
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of raw) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const span = Math.max(maxX - minX, maxY - minY, 1);
+  const norm = targetSize / span;
+  const flat = raw.map((p) => ({
+    x: (p.x - cx) * norm,
+    y: (p.y - cy) * norm + offsetY,
+    z: 0,
+  }));
+
+  const pts: Vec3[] = [];
+  const layers = 10;
+
+  for (const p of flat) {
+    for (let li = 0; li < layers; li++) {
+      const u = layers > 1 ? li / (layers - 1) : 0.5;
+      const z = (u - 0.5) * zDepth;
+      const swell = 1 + Math.sin(u * Math.PI) * 0.05;
+      pts.push({
+        x: p.x * swell + (Math.random() - 0.5) * 0.35,
+        y: p.y * swell + (Math.random() - 0.5) * 0.35,
+        z: z + (Math.random() - 0.5) * 2.2,
+      });
+    }
+  }
+
+  const shellN = Math.max(120, Math.floor(flat.length * 0.35));
+  for (let i = 0; i < shellN; i++) {
+    const pick = flat[Math.floor(Math.random() * flat.length)];
+    pts.push({
+      x: pick.x + (Math.random() - 0.5) * 1.2,
+      y: pick.y + (Math.random() - 0.5) * 1.2,
+      z: (Math.random() - 0.5) * zDepth,
+    });
   }
 
   return pts;
 }
 
 /** Tim rỗng — density thấp, Z sâu, không fill blob trắng */
-export function sampleHollowHeart(count: number, scale = 0.38): Vec3[] {
+export function sampleHollowHeart(count: number, scale = 0.38, offsetY = 0): Vec3[] {
   const pts: Vec3[] = [];
   let guard = 0;
 
@@ -85,7 +157,7 @@ export function sampleHollowHeart(count: number, scale = 0.38): Vec3[] {
 
     pts.push({
       x: x + (Math.random() - 0.5) * 2,
-      y: y + (Math.random() - 0.5) * 2,
+      y: y + offsetY + (Math.random() - 0.5) * 2,
       z: (Math.random() - 0.5) * 20,
     });
   }
@@ -125,22 +197,9 @@ export function buildTargetBuffer(samples: Vec3[], count: number): Float32Array 
   return buf;
 }
 
-/** Chữ 3D — phân bố đều, jitter nhỏ để không thành cụm sao nhiễu */
+/** Chữ 3D — phân bố hạt giống mesh trái tim */
 export function buildTextTargetBuffer(samples: Vec3[], count: number): Float32Array {
-  const buf = new Float32Array(count * 3);
-  const n = samples.length;
-  if (n === 0) return buf;
-
-  for (let i = 0; i < count; i++) {
-    const pick = samples[Math.floor((i * n) / count) % n];
-    const layer = (i * 7) % 11;
-    const j = 0.03 + layer * 0.004;
-    const i3 = i * 3;
-    buf[i3] = pick.x + (Math.random() - 0.5) * j;
-    buf[i3 + 1] = pick.y + (Math.random() - 0.5) * j;
-    buf[i3 + 2] = pick.z + (Math.random() - 0.5) * 0.35;
-  }
-  return buf;
+  return buildTargetBuffer(samples, count);
 }
 
 export function assignPastelColors(count: number): Float32Array {
