@@ -118,7 +118,7 @@ export function buildTargetBuffer(samples: Vec3[], count: number): Float32Array 
   return buf;
 }
 
-export function assignPastelColors(count: number, seed = 0): Float32Array {
+export function assignPastelColors(count: number): Float32Array {
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
     const c = PALETTE[Math.floor(Math.random() * PALETTE.length)].clone();

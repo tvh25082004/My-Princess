@@ -129,11 +129,11 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   scene.add(starNear.mesh);
 
   const content = new THREE.Group();
+  content.scale.setScalar(mobile ? 3.2 : 4.2);
   scene.add(content);
 
   const particles = createShaderPoints(count, glowMap, mobile);
-  const pastel = assignPastelColors(count);
-  particles.colors.set(pastel);
+  particles.colors.set(assignPastelColors(count));
   content.add(particles.mesh);
 
   const fontSize = mobile ? 58 : 72;
@@ -153,10 +153,6 @@ export async function initRomanticSpace(container: HTMLElement): Promise<Romanti
   fromBuf.set(scatterTarget);
   toBuf.set(scatterTarget);
   particles.positions.set(scatterTarget);
-
-  const heartGroup = new THREE.Group();
-  content.add(heartGroup);
-  heartGroup.add(particles.mesh);
 
   let morphT = 1;
   let phase: "intro" | "heart" = "intro";
