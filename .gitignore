@@ -1,0 +1,13 @@
+# Dependencies & build
+web/node_modules/
+web/dist/
+web/.vite/
+
+# OS & IDE
+.DS_Store
+*.log
+.env
+.env.*
+
+# Cursor local (optional tooling)
+.cursor/
